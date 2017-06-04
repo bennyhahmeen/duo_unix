@@ -1,6 +1,3 @@
-%define libname libduo
-%define develname duo_unix-devel
-
 Name: duo_unix
 Version: @VERSION@
 Release: 0%{?dist}
@@ -14,8 +11,17 @@ URL: http://www.duosecurity.com/
 Source0: https://dl.duosecurity.com/%{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
-Requires: pam openssl %{libname} = %{version}
+%if 0%{sles_version == 11}
+Requires: pam openssl zlib
+%else
+Requires: pam openssl
+%endif
+
+%if 0%{sles_version}
+BuildRequires: pam-devel openssl-devel pkgconfig openssh zlib-devel
+%else
 BuildRequires: pam-devel openssl-devel pkgconfig openssh-server
+%endif
 
 %description
 Duo provides simple two-factor authentication as a service via:
@@ -30,34 +36,22 @@ This package allows an admin (or ordinary user) to quickly add Duo
 authentication to any Unix login without setting up secondary user
 accounts, directory synchronization, servers, or hardware.
 
-%package -n %{libname}
-Summary: Shared libraries for duo authentication
-Group: System/Libraries
-
-%description -n %{libname}
-Shared libraries for duo_unix
-
 %package -n pam_duo
 Summary: A PAM module for duo authentication
 Group: System/Libraries
-Requires: %{libname} = %{version}
 
 %description -n pam_duo
 A PAM module for duo authentication
-
-%package -n %{develname}
-Summary: Development files and documentation for duo_unix
-Group: System/Libraries
-Requires: %{libname} = %{version}
-
-%description -n %{develname}
-Development files and documentation for duo_unix
 
 %prep
 %setup -q -n %{name}-%{version}
 
 %build
+%if 0%{sles_version}
+%configure --with-pam=/%{_lib}/security --sysconfdir=%{_sysconfdir}/duo --with-privsep-user=sshd --includedir=/%{_includedir}/duo --docdir=%{_defaultdocdir}/duo_unix
+%else
 %configure --with-pam=/%{_lib}/security --sysconfdir=%{_sysconfdir}/duo --with-privsep-user=sshd --includedir=/%{_includedir}/duo
+%endif
 make %{?_smp_mflags}
 
 %clean
@@ -68,39 +62,26 @@ make %{?_smp_mflags}
 make install DESTDIR=$RPM_BUILD_ROOT
 rm -f $RPM_BUILD_ROOT/%{_lib}/security/pam_duo.*a
 
-%post -n libduo -p /sbin/ldconfig
-
-%postun -n libduo -p /sbin/ldconfig
-
 %files
 %defattr(-,root,root)
 %dir %{_sysconfdir}/duo
 %attr(0600, sshd, root) %config(noreplace) %{_sysconfdir}/duo/login_duo.conf
 %attr(4755, root, root) %{_sbindir}/login_duo
 %{_mandir}/man8/login_duo.8.gz
+%exclude %{_mandir}/man3/duo.3.gz
 %{_defaultdocdir}/%{name}/AUTHORS
 %{_defaultdocdir}/%{name}/CHANGES
 %{_defaultdocdir}/%{name}/LICENSE
 %{_defaultdocdir}/%{name}/README
+%exclude %{_includedir}/duo
+%exclude %{_includedir}/duo/*.h
+%exclude %{_libdir}/pkgconfig/*
 
 %files -n pam_duo
 %dir %{_sysconfdir}/duo
 /%{_lib}/security/pam_duo.so
 %config(noreplace) %attr(640, root, root) %{_sysconfdir}/duo/pam_duo.conf
 %{_mandir}/man8/pam_duo.8.gz
-
-%files -n %{libname}
-%defattr(-,root,root)
-%{_libdir}/libduo.so*
-
-%files -n %{develname}
-%defattr(-,root,root)
-%{_libdir}/libduo.a
-%{_libdir}/libduo.la
-%{_includedir}/duo/duo.h
-%{_includedir}/duo/util.h
-%{_libdir}/pkgconfig/libduo.pc
-%{_mandir}/man3/duo.3.gz
 
 %changelog
 * Sun Jul 12 2014 S. Zachariah Sprackett <zac@sprackett.com> 0:1.9.11-0
